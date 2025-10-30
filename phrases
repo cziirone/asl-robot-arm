@@ -1,0 +1,85 @@
+class PhraseId(str, Enum):
+    HELLO = "HELLO"
+    HOW_ARE_YOU = "HOW_ARE_YOU"
+    DO_YOU_KNOW_ASL = "DO_YOU_KNOW_ASL"
+    THANK_YOU = "THANK_YOU"
+    PLEASE = "PLEASE"
+    NICE_TO_MEET_YOU = "NICE_TO_MEET_YOU"
+    YES = "YES"
+    NO = "NO"
+    SORRY = "SORRY"
+    I_LOVE_YOU = "I_LOVE_YOU"
+
+# Human-readable descriptions (great for Swagger screenshots)
+PHRASE_DESCRIPTIONS: Dict[PhraseId, str] = {
+    PhraseId.HELLO: "“Hello” wave",
+    PhraseId.HOW_ARE_YOU: "“How are you?” (HOW + YOU)",
+    PhraseId.DO_YOU_KNOW_ASL: "“Do you know ASL?” (YOU + KNOW + ASL + QUESTION)",
+    PhraseId.THANK_YOU: "“Thank you”",
+    PhraseId.PLEASE: "“Please”",
+    PhraseId.NICE_TO_MEET_YOU: "“Nice to meet you”",
+    PhraseId.YES: "“Yes”",
+    PhraseId.NO: "“No”",
+    PhraseId.SORRY: "“Sorry”",
+    PhraseId.I_LOVE_YOU: "“I Love You” (ILY handshape)",
+}
+
+# Mock choreography tokens that your sim can interpret later
+PHRASE_TOKENS: Dict[PhraseId, List[str]] = {
+    PhraseId.HELLO: ["WAVE"],
+    PhraseId.HOW_ARE_YOU: ["HOW", "YOU"],
+    PhraseId.DO_YOU_KNOW_ASL: ["YOU", "KNOW", "ASL", "QUESTION"],
+    PhraseId.THANK_YOU: ["THANK_YOU"],
+    PhraseId.PLEASE: ["PLEASE"],
+    PhraseId.NICE_TO_MEET_YOU: ["NICE", "MEET", "YOU"],
+    PhraseId.YES: ["YES"],
+    PhraseId.NO: ["NO"],
+    PhraseId.SORRY: ["SORRY"],
+    PhraseId.I_LOVE_YOU: ["ILY"],
+}
+
+class PhraseReq(BaseModel):
+    phrase_id: PhraseId
+    speed: float = 1.0
+    handedness: Optional[Literal["left", "right", "both"]] = "right"
+
+    @field_validator("speed")
+    @classmethod
+    def validate_speed(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("speed must be > 0")
+        return v
+
+@app.get("/sign/phrases", summary="List common phrases")
+def list_phrases():
+    return {
+        "supported": [
+            {"id": pid.value, "description": PHRASE_DESCRIPTIONS[pid]}
+            for pid in PhraseId
+        ]
+    }
+
+@app.post("/sign/phrase", response_model=MotionStatus, summary="Sign one common phrase")
+async def sign_phrase(req: PhraseReq):
+    tokens = PHRASE_TOKENS.get(req.phrase_id)
+    if not tokens:
+        raise HTTPException(400, "Unsupported phrase")
+    mot_id = new_motion_id()
+    MOTIONS[mot_id] = Motion(
+        motion_id=mot_id,
+        kind="PHRASE",
+        payload={
+            "phrase_id": req.phrase_id,
+            "description": PHRASE_DESCRIPTIONS[req.phrase_id],
+            "tokens": tokens,
+            "speed": req.speed,
+            "handedness": req.handedness,
+            "length": len(tokens),
+        },
+        created_ms=now_ms(),
+        updated_ms=now_ms(),
+    )
+    # Simulate longer duration proportional to number of tokens
+    asyncio.create_task(simulate_motion(mot_id, units=len(tokens), speed=req.speed))
+    m = MOTIONS[mot_id]
+    return MotionStatus(motion_id=m.motion_id, status=m.status, progress=m.progress)
