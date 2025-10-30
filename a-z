@@ -52,3 +52,245 @@ async def demo_a_to_z(speed: float = 1.0):
     asyncio.create_task(simulate_motion(mot_id, units=len(LETTERS), speed=speed))
     m = MOTIONS[mot_id]
     return MotionStatus(motion_id=m.motion_id, status=m.status, progress=m.progress)
+
+
+# app/poses.py
+# Simplified ASL fingerspelling descriptions (not a substitute for a qualified ASL source).
+# Fields are designed to be easy for a simulator to consume: handshape/orientation/movement.
+LETTER_POSES = {
+    "A": {
+        "handshape": "fist",
+        "thumb": "alongside index (outside), not tucked",
+        "fingers": "all curled",
+        "orientation": "palm out or to the side",
+        "location": "neutral in front of torso",
+        "movement": "static",
+        "notes": "Closed fist; thumb visible on the outside."
+    },
+    "B": {
+        "handshape": "flat hand",
+        "thumb": "across palm",
+        "fingers": "four together, straight",
+        "orientation": "palm forward",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Like a stop sign hand; thumb tucked across palm."
+    },
+    "C": {
+        "handshape": "curved hand forms a 'C'",
+        "thumb": "curved opposite fingers",
+        "fingers": "curved together",
+        "orientation": "palm slightly in or to the side",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Hand and thumb curve to outline the letter C."
+    },
+    "D": {
+        "handshape": "index up",
+        "thumb": "touches middle finger to make circle",
+        "fingers": "middle/ring/pinky curled",
+        "orientation": "palm forward",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Index points up; thumb+middle make a round ‘D’ base."
+    },
+    "E": {
+        "handshape": "bent fingers",
+        "thumb": "touches fingertips",
+        "fingers": "all bent toward thumb",
+        "orientation": "palm forward or slightly in",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Think of gently curling fingertips to thumb."
+    },
+    "F": {
+        "handshape": "OK-ring",
+        "thumb": "touches index fingertip (circle)",
+        "fingers": "middle/ring/pinky extended",
+        "orientation": "palm forward",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "‘OK’ sign with remaining fingers straight."
+    },
+    "G": {
+        "handshape": "pinch/point",
+        "thumb": "parallel to index",
+        "fingers": "index extended sideways; others curled",
+        "orientation": "palm inward or sideways",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Index and thumb parallel like measuring a small gap."
+    },
+    "H": {
+        "handshape": "two-finger point",
+        "thumb": "holds ring/pinky",
+        "fingers": "index+middle together, sideways",
+        "orientation": "palm inward or sideways",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Like ‘G’ but with index+middle together extended."
+    },
+    "I": {
+        "handshape": "pinky up",
+        "thumb": "across curled fingers",
+        "fingers": "pinky up; others curled",
+        "orientation": "palm forward/side",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Rock-on shape without the thumb out."
+    },
+    "J": {
+        "handshape": "I to J trace",
+        "thumb": "across curled fingers",
+        "fingers": "pinky up; others curled",
+        "orientation": "start palm forward",
+        "location": "neutral",
+        "movement": "trace 'J' in the air with pinky",
+        "notes": "Start from ‘I’ handshape, draw a ‘J’ down/out."
+    },
+    "K": {
+        "handshape": "V with thumb on middle base",
+        "thumb": "touches base of middle finger",
+        "fingers": "index+middle spread; ring/pinky curled",
+        "orientation": "palm forward",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Looks like a two-finger ‘V’ with thumb anchored."
+    },
+    "L": {
+        "handshape": "L",
+        "thumb": "extended to form base",
+        "fingers": "index up; others curled",
+        "orientation": "palm side/forward",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Index and thumb make a clear ‘L’ angle."
+    },
+    "M": {
+        "handshape": "fist over thumb",
+        "thumb": "under three fingers (index/middle/ring)",
+        "fingers": "press over thumb; pinky curled",
+        "orientation": "palm out/side",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Three humps over thumb (think ‘M’=3)."
+    },
+    "N": {
+        "handshape": "fist over thumb",
+        "thumb": "under two fingers (index/middle)",
+        "fingers": "index/middle over thumb; ring/pinky curled",
+        "orientation": "palm out/side",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Two humps over thumb (think ‘N’=2)."
+    },
+    "O": {
+        "handshape": "O",
+        "thumb": "meets fingertips",
+        "fingers": "all meet thumb forming circle",
+        "orientation": "palm forward/side",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Hand forms a round ‘O’."
+    },
+    "P": {
+        "handshape": "K downward",
+        "thumb": "on middle base",
+        "fingers": "index+middle spread; others curled",
+        "orientation": "palm down",
+        "location": "neutral (tilt downward)",
+        "movement": "static",
+        "notes": "Like ‘K’ but pointed downward."
+    },
+    "Q": {
+        "handshape": "G downward",
+        "thumb": "parallel to index",
+        "fingers": "index extended; others curled",
+        "orientation": "palm down",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Like ‘G’ but pointing downward."
+    },
+    "R": {
+        "handshape": "crossed fingers",
+        "thumb": "tucks against ring/pinky",
+        "fingers": "index over middle (crossed)",
+        "orientation": "palm forward",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Index crosses over middle."
+    },
+    "S": {
+        "handshape": "fist",
+        "thumb": "across front of fingers",
+        "fingers": "all curled",
+        "orientation": "palm out/side",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Fist with thumb over fingers."
+    },
+    "T": {
+        "handshape": "fist with thumb between index/middle",
+        "thumb": "tucked between index and middle",
+        "fingers": "all curled",
+        "orientation": "palm out/side",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Thumb peeks between index & middle."
+    },
+    "U": {
+        "handshape": "two fingers together",
+        "thumb": "holds ring/pinky",
+        "fingers": "index+middle straight together",
+        "orientation": "palm forward",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Like ‘H’ but vertical/up."
+    },
+    "V": {
+        "handshape": "V",
+        "thumb": "holds ring/pinky",
+        "fingers": "index+middle spread in V",
+        "orientation": "palm forward",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Peace sign facing outward."
+    },
+    "W": {
+        "handshape": "three fingers up",
+        "thumb": "holds pinky",
+        "fingers": "index+middle+ring up, spread",
+        "orientation": "palm forward",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Three fingers make a ‘W’."
+    },
+    "X": {
+        "handshape": "hooked index",
+        "thumb": "rests against curled fingers",
+        "fingers": "index hooked; others curled",
+        "orientation": "palm forward",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Crooked/curled index like a claw."
+    },
+    "Y": {
+        "handshape": "hang-loose",
+        "thumb": "extended",
+        "fingers": "pinky extended; others curled",
+        "orientation": "palm side/forward",
+        "location": "neutral",
+        "movement": "static",
+        "notes": "Thumb+pinky out; middle three curled."
+    },
+    "Z": {
+        "handshape": "index draws Z",
+        "thumb": "along curled fingers",
+        "fingers": "index extended; others curled",
+        "orientation": "palm forward",
+        "location": "neutral",
+        "movement": "trace ‘Z’ in air: right→left, down-right, left",
+        "notes": "Use index to draw the letter Z."
+    },
+}
+
