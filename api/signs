@@ -1,0 +1,162 @@
+from typing import List, Literal, Optional, Dict
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI(title="ASL Signs API", version="0.1.0")
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Data layer (simple dictionary “database” you can expand later)
+# - Each sign returns a description and a 6-DoF joint target vector as placeholder.
+# ───────────────────────────────────────────────────────────────────────────────
+
+# Minimal helper to keep joint vectors consistent (placeholders!)
+def j(a, b, c, d, e, f): return [a, b, c, d, e, f]
+
+LETTER_SIGNS: Dict[str, Dict] = {
+    "A": {"description": "Closed fist, thumb along the side.",
+          "joints": j(0.0, -0.2, 0.9, 0.1, 0.0, 0.0)},
+    "B": {"description": "Flat hand, fingers together, thumb across palm.",
+          "joints": j(0.1, 0.3, -0.6, 0.2, 0.0, 0.0)},
+    "C": {"description": "Hand curved like the letter C.",
+          "joints": j(0.2, 0.5, -0.2, 0.1, 0.0, 0.0)},
+    "D": {"description": "Index up, other fingers touching thumb.",
+          "joints": j(0.1, 0.4, -0.1, 0.3, 0.0, 0.0)},
+    "E": {"description": "Fingers curled to palm, thumb across fingers.",
+          "joints": j(0.0, -0.1, 0.7, 0.1, 0.0, 0.0)},
+    "F": {"description": "Thumb and index make a circle; other fingers extended.",
+          "joints": j(0.1, 0.2, -0.3, 0.4, 0.0, 0.0)},
+    "G": {"description": "Index and thumb parallel (pointing sideways).",
+          "joints": j(0.3, -0.2, 0.1, 0.2, 0.0, 0.0)},
+    "H": {"description": "Index and middle together, pointing sideways.",
+          "joints": j(0.4, -0.2, 0.0, 0.2, 0.0, 0.0)},
+    "I": {"description": "Pinkie up; other fingers closed.",
+          "joints": j(0.0, -0.3, 0.8, 0.1, 0.0, 0.0)},
+    "J": {"description": "Trace a 'J' with pinkie (movement).",
+          "joints": j(0.0, -0.2, 0.7, 0.2, 0.0, 0.0), "motion": "arc-down-right"},
+    "K": {"description": "Index and middle up forming a 'V', thumb touches middle.",
+          "joints": j(0.2, 0.3, -0.2, 0.5, 0.0, 0.0)},
+    "L": {"description": "Index up, thumb out, forming an 'L'.",
+          "joints": j(0.2, 0.4, -0.3, 0.0, 0.0, 0.0)},
+    "M": {"description": "Thumb under first three fingers.",
+          "joints": j(0.0, -0.1, 0.9, 0.2, 0.0, 0.0)},
+    "N": {"description": "Thumb under first two fingers.",
+          "joints": j(0.0, -0.1, 0.8, 0.1, 0.0, 0.0)},
+    "O": {"description": "Fingers and thumb touch to make an 'O'.",
+          "joints": j(0.1, 0.4, -0.1, 0.1, 0.0, 0.0)},
+    "P": {"description": "Like 'K' but palm down (tilted).",
+          "joints": j(-0.2, 0.2, -0.3, 0.5, 0.0, -0.4)},
+    "Q": {"description": "Like 'G' but hand points downward.",
+          "joints": j(-0.3, -0.2, 0.1, 0.2, 0.0, -0.2)},
+    "R": {"description": "Index and middle crossed.",
+          "joints": j(0.1, 0.2, -0.4, 0.3, 0.0, 0.0)},
+    "S": {"description": "Fist with thumb across fingers.",
+          "joints": j(0.0, -0.2, 0.9, 0.0, 0.0, 0.0)},
+    "T": {"description": "Thumb tucked between index and middle.",
+          "joints": j(0.0, -0.1, 0.8, 0.0, 0.0, 0.0)},
+    "U": {"description": "Index and middle together, pointing up.",
+          "joints": j(0.2, 0.5, -0.2, 0.2, 0.0, 0.0)},
+    "V": {"description": "Index and middle spread (V shape).",
+          "joints": j(0.2, 0.5, -0.1, 0.3, 0.0, 0.0)},
+    "W": {"description": "Three fingers up (index/middle/ring).",
+          "joints": j(0.3, 0.5, -0.2, 0.3, 0.0, 0.0)},
+    "X": {"description": "Hooked index finger; others curled.",
+          "joints": j(0.1, -0.1, 0.6, 0.3, 0.0, 0.0)},
+    "Y": {"description": "Thumb and pinkie out; other fingers in.",
+          "joints": j(0.2, -0.1, 0.5, 0.1, 0.0, 0.2)},
+    "Z": {"description": "Trace a 'Z' with index (movement).",
+          "joints": j(0.2, 0.3, -0.2, 0.2, 0.0, 0.0), "motion": "zigzag"},
+}
+
+PHRASES: Dict[str, List[str]] = {
+    # You can later map these to native phrase gestures; for now we default to fingerspelling
+    "HELLO": list("HELLO"),
+    "HOW ARE YOU": list("HOWAREYOU".replace(" ", "")),
+    "DO YOU KNOW ASL": list("DOYOUKNOWASL".replace(" ", "")),
+    "PLEASE": list("PLEASE"),
+    "THANK YOU": list("THANKYOU".replace(" ", "")),
+    "SORRY": list("SORRY"),
+    "I LOVE YOU": list("ILOVEYOU".replace(" ", "")),
+    "NICE TO MEET YOU": list("NICETOMEETYOU".replace(" ", "")),
+}
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Request/Response models
+# ───────────────────────────────────────────────────────────────────────────────
+
+class LetterRequest(BaseModel):
+    letter: str
+
+class PhraseRequest(BaseModel):
+    phrase: str
+    mode: Literal["fingerspell", "native"] = "fingerspell"  # “native” for future direct phrase motions
+
+class SignResponse(BaseModel):
+    type: Literal["letter", "phrase"]
+    description: str
+    sequence: List[Dict]  # list of steps: each has {symbol, joints, description, optional motion}
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Utility
+# ───────────────────────────────────────────────────────────────────────────────
+
+def normalize_letter(ch: str) -> str:
+    if not ch or len(ch) != 1 or not ch.isalpha():
+        raise HTTPException(status_code=400, detail="Provide a single A–Z letter.")
+    return ch.upper()
+
+def get_letter_step(letter: str) -> Dict:
+    L = normalize_letter(letter)
+    if L not in LETTER_SIGNS:
+        raise HTTPException(status_code=404, detail=f"Letter '{L}' not available.")
+    payload = {"symbol": L, **LETTER_SIGNS[L]}
+    return payload
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Routes (/api/signs/…)
+# ───────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/signs/catalog/letters")
+def catalog_letters():
+    """List all available letters with short descriptions."""
+    return [
+        {"letter": k, "description": v["description"]}
+        for k, v in LETTER_SIGNS.items()
+    ]
+
+@app.get("/api/signs/catalog/phrases")
+def catalog_phrases():
+    """List all available phrases."""
+    return [{"phrase": p, "letters": PHRASES[p]} for p in PHRASES.keys()]
+
+@app.post("/api/signs/letter", response_model=SignResponse)
+def sign_letter(req: LetterRequest):
+    step = get_letter_step(req.letter)
+    return SignResponse(
+        type="letter",
+        description=f"ASL letter '{step['symbol']}'",
+        sequence=[step],
+    )
+
+@app.post("/api/signs/phrase", response_model=SignResponse)
+def sign_phrase(req: PhraseRequest):
+    phrase_key = req.phrase.strip().upper()
+    if phrase_key not in PHRASES:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Phrase '{req.phrase}' not found. Try one of: {', '.join(PHRASES.keys())}"
+        )
+
+    if req.mode == "fingerspell":
+        seq = [get_letter_step(ch) for ch in PHRASES[phrase_key]]
+        return SignResponse(
+            type="phrase",
+            description=f"Fingerspelling phrase '{phrase_key}'",
+            sequence=seq,
+        )
+    else:
+        # Placeholder: in the future, return a single native-gesture step with its own trajectory
+        return SignResponse(
+            type="phrase",
+            description=f"Native gesture for '{phrase_key}' (placeholder)",
+            sequence=[{"symbol": phrase_key, "description": "Native gesture (TBD)", "joints": j(0,0,0,0,0,0)}],
+        )
