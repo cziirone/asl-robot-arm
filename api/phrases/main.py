@@ -1,111 +1,210 @@
-from fastapi import FastAPI, HTTPException
+# api/phrases/main.py
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
-from typing import Dict, List, Literal, Optional
+from typing import List, Dict, Optional
 
-app = FastAPI(title="ASL Phrases API", version="0.1.0")
+app = FastAPI(title="ASL Phrases API", version="1.0.0")
 
+# ---------- Data Models ----------
 class Step(BaseModel):
-    type: Literal["sign", "fingerspell"]
-    token: str                  # e.g., "HELLO" or a letter "A"
-    hold_ms: int = 700          # simple timing default
+    handshape: str
+    orientation: str
+    location: str
+    motion: str = "none"
 
 class Phrase(BaseModel):
-    key: str                    # slug/id
-    text: str                   # English text
-    gloss: str                  # ASL gloss (simple)
-    sequence: List[Step]        # ordered steps
+    key: str
+    name: str
+    steps: List[Step]
     notes: Optional[str] = None
 
+# ---------- Phrase Library ----------
 PHRASES: Dict[str, Phrase] = {
-    "hello": Phrase(
-        key="hello",
-        text="Hello",
-        gloss="HELLO",
-        sequence=[Step(type="sign", token="HELLO", hold_ms=700)],
-        notes="Flat hand near temple moves outward."
-    ),
-    "how-are-you": Phrase(
-        key="how-are-you",
-        text="How are you?",
-        gloss="HOW YOU",
-        sequence=[
-            Step(type="sign", token="HOW", hold_ms=900),
-            Step(type="sign", token="YOU", hold_ms=700),
+    # HELLO
+    "PHRASE_HELLO": Phrase(
+        key="PHRASE_HELLO",
+        name="hello",
+        steps=[
+            Step(
+                handshape="flat-hand",
+                orientation="palm-out",
+                location="near-temple",
+                motion="small-outward-wave"
+            )
         ],
-        notes="Arched hands roll for HOW; point for YOU."
+        notes="Flat hand starts near temple and moves outward in a small wave motion."
     ),
-    "do-you-know-asl": Phrase(
-        key="do-you-know-asl",
-        text="Do you know ASL?",
-        gloss="YOU KNOW ASL (QUESTION)",
-        sequence=[
-            Step(type="sign", token="YOU", hold_ms=600),
-            Step(type="sign", token="KNOW", hold_ms=800),
-            Step(type="fingerspell", token="A", hold_ms=300),
-            Step(type="fingerspell", token="S", hold_ms=300),
-            Step(type="fingerspell", token="L", hold_ms=300),
+
+    # HOW ARE YOU
+    "PHRASE_HOW_ARE_YOU": Phrase(
+        key="PHRASE_HOW_ARE_YOU",
+        name="how are you",
+        steps=[
+            Step(
+                handshape="curved-hands",
+                orientation="palm-down",
+                location="chest",
+                motion="twist-together"
+            ),
+            Step(
+                handshape="index-point",
+                orientation="palm-forward",
+                location="neutral-space",
+                motion="none"
+            )
         ],
-        notes="Eyebrows up for yes/no question."
+        notes="Hands twist together for 'how', then point forward for 'you'."
     ),
-    "please": Phrase(
-        key="please", text="Please", gloss="PLEASE",
-        sequence=[Step(type="sign", token="PLEASE", hold_ms=900)]
-    ),
-    "thank-you": Phrase(
-        key="thank-you", text="Thank you", gloss="THANK-YOU",
-        sequence=[Step(type="sign", token="THANK-YOU", hold_ms=900)]
-    ),
-    "nice-to-meet-you": Phrase(
-        key="nice-to-meet-you", text="Nice to meet you", gloss="NICE MEET YOU",
-        sequence=[
-            Step(type="sign", token="NICE", hold_ms=700),
-            Step(type="sign", token="MEET", hold_ms=900),
-            Step(type="sign", token="YOU", hold_ms=600),
+
+    # DO YOU KNOW ASL
+    "PHRASE_DO_YOU_KNOW_ASL": Phrase(
+        key="PHRASE_DO_YOU_KNOW_ASL",
+        name="do you know ASL",
+        steps=[
+            Step(
+                handshape="flat-hand",
+                orientation="palm-down",
+                location="temple",
+                motion="tap"
+            ),
+            Step(
+                handshape="index-point",
+                orientation="palm-forward",
+                location="neutral-space",
+                motion="none"
+            ),
+            Step(
+                handshape="a-s-l-sequence",
+                orientation="varies",
+                location="neutral-space",
+                motion="spell"
+            )
         ],
+        notes="Tap forehead for 'know', point forward for 'you', then spell A-S-L."
     ),
-    "sorry": Phrase(
-        key="sorry", text="Sorry", gloss="SORRY",
-        sequence=[Step(type="sign", token="SORRY", hold_ms=900)]
+
+    # PLEASE
+    "PHRASE_PLEASE": Phrase(
+        key="PHRASE_PLEASE",
+        name="please",
+        steps=[
+            Step(
+                handshape="flat-hand",
+                orientation="palm-in",
+                location="chest",
+                motion="circle-clockwise"
+            )
+        ],
+        notes="Flat hand on chest, make circular motion clockwise."
     ),
-    "i-love-you": Phrase(
-        key="i-love-you", text="I love you", gloss="ILY",
-        sequence=[Step(type="sign", token="ILY", hold_ms=1000)]
+
+    # THANK YOU
+    "PHRASE_THANK_YOU": Phrase(
+        key="PHRASE_THANK_YOU",
+        name="thank you",
+        steps=[
+            Step(
+                handshape="flat-hand",
+                orientation="palm-in",
+                location="chin",
+                motion="move-forward"
+            )
+        ],
+        notes="Flat hand from chin forward, palm up."
+    ),
+
+    # NICE TO MEET YOU
+    "PHRASE_NICE_TO_MEET_YOU": Phrase(
+        key="PHRASE_NICE_TO_MEET_YOU",
+        name="nice to meet you",
+        steps=[
+            Step(
+                handshape="flat-hands",
+                orientation="palm-in",
+                location="neutral-space",
+                motion="slide-right"
+            ),
+            Step(
+                handshape="index-up",
+                orientation="palm-in",
+                location="neutral-space",
+                motion="hands-meet"
+            )
+        ],
+        notes="Left palm stationary, right slides across it, then both index fingers meet upright."
+    ),
+
+    # SORRY
+    "PHRASE_SORRY": Phrase(
+        key="PHRASE_SORRY",
+        name="sorry",
+        steps=[
+            Step(
+                handshape="fist",
+                orientation="palm-in",
+                location="chest",
+                motion="circle-clockwise"
+            )
+        ],
+        notes="Fist over chest moves in small clockwise circles."
+    ),
+
+    # I LOVE YOU
+    "PHRASE_I_LOVE_YOU": Phrase(
+        key="PHRASE_I_LOVE_YOU",
+        name="i love you",
+        steps=[
+            Step(
+                handshape="i-love-you-shape",
+                orientation="palm-forward",
+                location="neutral-space",
+                motion="none"
+            )
+        ],
+        notes="Thumb, index, and pinky extended (I+L+Y)."
     ),
 }
 
-@app.get("/")
+# ---------- Helpers ----------
+def filter_phrases(q: Optional[str]) -> List[Phrase]:
+    if not q:
+        return list(PHRASES.values())
+    ql = q.lower()
+    out: List[Phrase] = []
+    for p in PHRASES.values():
+        if (
+            ql in p.key.lower() or
+            ql in p.name.lower() or
+            (p.notes and ql in p.notes.lower())
+        ):
+            out.append(p)
+    return out
+
+# ---------- Endpoints ----------
+@app.get("/", tags=["meta"])
 def root():
-    return {"service": "phrases", "endpoints": ["/phrases", "/phrases/{key}", "/phrases/{key}/plan"]}
+    return {"service": "asl-phrases", "version": "1.0.0"}
 
-@app.get("/health")
+@app.get("/health", tags=["meta"])
 def health():
-    return {"status": "ok"}
+    return {"ok": True}
 
-@app.get("/phrases", response_model=List[Phrase])
-def list_phrases():
-    return list(PHRASES.values())
+@app.get("/phrases", response_model=List[Phrase], tags=["phrases"])
+def list_phrases(q: Optional[str] = Query(None, description="Search by name or notes")):
+    return sorted(filter_phrases(q), key=lambda p: p.key)
 
-@app.get("/phrases/{key}", response_model=Phrase)
-def get_phrase(key: str):
-    k = key.strip().lower()
-    if k not in PHRASES:
-        raise HTTPException(status_code=404, detail=f"Phrase '{key}' not found")
-    return PHRASES[k]
+@app.get("/phrases/{phrase_key}", response_model=Phrase, tags=["phrases"])
+def get_phrase(phrase_key: str):
+    key = phrase_key.upper()
+    phrase = PHRASES.get(key)
+    if not phrase:
+        raise HTTPException(status_code=404, detail=f"Phrase '{phrase_key}' not found")
+    return phrase
 
-@app.get("/phrases/{key}/plan")
-def compile_phrase_to_plan(key: str):
-    """
-    Returns a simple 'animation plan' you can later map to robot joint targets.
-    """
-    phrase = get_phrase(key)
-    plan = []
-    t_ms = 0
-    for step in phrase.sequence:
-        plan.append({
-            "time_ms_start": t_ms,
-            "time_ms_end": t_ms + step.hold_ms,
-            "action": step.type,
-            "token": step.token
-        })
-        t_ms += step.hold_ms
-    return {"key": phrase.key, "total_ms": t_ms, "plan": plan}
+@app.get("/phrases/{phrase_key}/steps", response_model=List[Step], tags=["phrases"])
+def get_phrase_steps(phrase_key: str):
+    key = phrase_key.upper()
+    phrase = PHRASES.get(key)
+    if not phrase:
+        raise HTTPException(status_code=404, detail=f"Phrase '{phrase_key}' not found")
+    return phrase.steps
